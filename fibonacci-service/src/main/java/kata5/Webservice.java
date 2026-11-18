@@ -18,6 +18,7 @@ public final class Webservice {
 	private final String host;
 	private final int port;
 	private final String consul;
+	private final Gson gson = new Gson();
 
 	public Webservice(String id, String host, int port, String consul) {
 		this.id = id;
@@ -38,7 +39,7 @@ public final class Webservice {
 	}
 
 	private void init(JavalinConfig config) {
-		config.routes.get("/", this::fibonacci);
+		config.routes.get("/", this::handleFibonacci);
 		config.routes.get("/health", this::health);
 	}
 
@@ -46,13 +47,30 @@ public final class Webservice {
 		context.result("OK");
 	}
 
-	private void fibonacci(Context context) {
-		int terms = Integer.parseInt(context.queryParam("n"));
+	private void handleFibonacci(Context context) {
 		context.header("X-Node", id);
-		context.result(new Gson().toJson(fibonacci(terms)));
+		context.contentType("application/json");
+
+		String rawParam = context.queryParam("n");
+		if (rawParam == null || rawParam.isBlank()) {
+			context.status(400).result(gson.toJson(Map.of("error", "Falta el parámetro obligatorio 'n'")));
+			return;
+		}
+
+		try {
+			int terms = Integer.parseInt(rawParam);
+			if (terms < 1 || terms > 47) {
+				context.status(400).result(gson.toJson(Map.of("error", "El parámetro 'n' debe estar entre 1 y 47")));
+				return;
+			}
+			int[] series = calculateFibonacci(terms);
+			context.status(200).result(gson.toJson(series));
+		} catch (NumberFormatException e) {
+			context.status(400).result(gson.toJson(Map.of("error", "El parámetro 'n' debe ser un número entero válido")));
+		}
 	}
 
-	private int[] fibonacci(int n) {
+	public static int[] calculateFibonacci(int n) {
 		int[] result = new int[n];
 		int a = 0;
 		int b = 1;
@@ -94,8 +112,8 @@ public final class Webservice {
 
 	private boolean isLocalHost() {
 		return "localhost".equals(host) ||
-			   "127.0.0.1".equals(host) ||
-			   "0.0.0.0".equals(host);
+				"127.0.0.1".equals(host) ||
+				"0.0.0.0".equals(host);
 	}
 
 	private String healthUrl() {
@@ -103,16 +121,16 @@ public final class Webservice {
 	}
 
 	private String json() {
-		return new Gson().toJson(Map.of(
+		return gson.toJson(Map.of(
 				"ID", id,
 				"Name", "fibonacci_service_v1",
 				"Address", host(),
 				"Port", port,
 				"Check", Map.of(
-					"HTTP", healthUrl(),
-					"Interval", "5s",
-					"Timeout", "2s",
-					"DeregisterCriticalServiceAfter", "10m"
+						"HTTP", healthUrl(),
+						"Interval", "5s",
+						"Timeout", "2s",
+						"DeregisterCriticalServiceAfter", "10m"
 				)
 		));
 	}
