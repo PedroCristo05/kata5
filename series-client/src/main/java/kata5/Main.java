@@ -15,25 +15,30 @@ public class Main {
     static void main() throws InterruptedException, IOException {
         try (HttpClient client = client()) {
             while (true) {
-                int terms = ThreadLocalRandom.current().nextInt(1, 48);
-                HttpRequest request = request(terms);
+                int terms = ThreadLocalRandom.current().nextInt(1, 20);
+                String endpoint = ThreadLocalRandom.current().nextBoolean()
+                        ? "/api/v1/fibonacci/?n=" + terms
+                        : "/api/v1/primes/?n=" + terms;
+
+                HttpRequest request = request(endpoint);
                 CompletableFuture<HttpResponse<String>> future = client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
-                future.thenAccept(Main::showResponse);
-                Thread.sleep(100);
+                future.thenAccept(response -> showResponse(endpoint, response));
+                Thread.sleep(200);
             }
         }
     }
 
-    private static void showResponse(HttpResponse<String> response) {
-        if (response.statusCode() / 100 != 2) System.out.println("NGINX response " + response.statusCode());
-        else {
+    private static void showResponse(String endpoint, HttpResponse<String> response) {
+        if (response.statusCode() / 100 != 2) {
+            System.out.println("NGINX response " + response.statusCode() + " for " + endpoint);
+        } else {
             String node = response.headers().firstValue("X-Node").orElse("unknown");
-            System.out.println("Node: " + node + " | Body: " + response.body());
+            System.out.printf("Endpoint: %-26s | Node: %-4s | Body: %s%n", endpoint, node, response.body());
         }
     }
 
-    private static HttpRequest request(int terms) {
-        return HttpRequest.newBuilder(URI.create(address).resolve("/api/v1/fibonacci/?n=" + terms))
+    private static HttpRequest request(String endpoint) {
+        return HttpRequest.newBuilder(URI.create(address).resolve(endpoint))
                 .timeout(Duration.ofSeconds(5))
                 .GET()
                 .build();

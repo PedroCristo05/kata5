@@ -70,7 +70,6 @@ public final class Webservice {
 		}
 	}
 
-	// Lógica de dominio pura: primeros n números primos
 	public static int[] calculatePrimes(int n) {
 		int[] result = new int[n];
 		int count = 0;
